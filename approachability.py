@@ -10,12 +10,13 @@ import matplotlib.pyplot as plt
 from matplotlib.animation import FuncAnimation, PillowWriter
 
 # Plotting region [0, 10] x [0,10]
-segment = np.linspace(0, 10, 500)
+segment = np.linspace(0, 10, 1000)
 
 # Define the target set S
 in_S = lambda x : (x[0] - 3) ** 2 + (x[1] - 3) ** 2 <= 2
 X, Y  = np.meshgrid(segment, segment)
 S = in_S((X, Y))
+pts = np.column_stack([X[S], Y[S]])
 
 # A bounded sequence whose next element x_(n+1) always
 # satisfies < x_(n+1) - pi_S(bar(x)_n) , bar(x)_n - pi_S(bar(x)_n) >
@@ -27,7 +28,6 @@ S = in_S((X, Y))
 def spin_sequence(init = [5, 5], N = 50, step = 3):
     xbar = [np.array(init)]
     seq = [np.array(init)]
-    pts = np.column_stack([X[S], Y[S]])
     centre = pts.mean(axis=0)
     for n in range(1, N):
         p = xbar[-1]
@@ -47,24 +47,33 @@ def spin_sequence(init = [5, 5], N = 50, step = 3):
 
 # Plotting
 
-theta = np.linspace(0, 2 * np.pi, 120, endpoint=False)
-r = 2.2 + 0.6 * np.cos(5 * theta)
+theta = np.linspace(0, 2 * np.pi, 300, endpoint=False)
+r = 2.5 + 0.6 * np.cos(5 * theta)
 inits = 3 + r[:, None] * np.column_stack([np.cos(theta), np.sin(theta)])
 
 fig, ax = plt.subplots(figsize=(5, 5))
-ax.contourf(X, Y, S, levels=[0.5, 1], colors="0.6", alpha=0.3)   # region S, drawn once
-(seq_pts,) = ax.plot([], [], "o", ms=5, color="#2a78d6", label="Approaching sequence")
+ax.contourf(X, Y, S, levels=[0.5, 1], colors="0.6", alpha=0.3)
+(seq_pts,) = ax.plot([], [], "o", ms=5, color="#ffc400", label="Approaching sequence")
 (xbar_line,) = ax.plot([], [], "o", lw=2, color="#eb6834", label="Average")
-(start_pt,) = ax.plot([], [], "*", ms=12, color="#1baf7a", label="Initial point")
+(start_pt,) = ax.plot([], [], "*", ms=12, color="#0026ff", label="Initial point")
+(normal_line,) = ax.plot([], [], "-", lw=1, color="0.6", zorder=1)
+(tangent_line,) = ax.plot([], [], "-", lw=1, color="0.6", zorder=1)
 ax.set(xlim=(-2, 8), ylim=(-2, 8), aspect="equal")
 ax.legend(loc="upper right")
 
 def update(i):
-    seq, xbar = spin_sequence(init = inits[i])
+    p0 = inits[i]
+    seq, xbar = spin_sequence(init=p0)
     seq_pts.set_data(seq[:, 0], seq[:, 1])
     xbar_line.set_data(xbar[:, 0], xbar[:, 1])
-    start_pt.set_data([inits[i, 0]], [inits[i, 1]])
-    return seq_pts, xbar_line, start_pt
+    start_pt.set_data([p0[0]], [p0[1]])
+    proj = pts[np.argmin(((pts - p0) ** 2).sum(axis=1))]
+    normal = p0 - proj
+    t = np.array([normal[1], -normal[0]]) / np.linalg.norm(normal)
+    ends = np.stack([proj - 3 * t, proj + 3 * t])          
+    normal_line.set_data([p0[0], proj[0]], [p0[1], proj[1]])
+    tangent_line.set_data(ends[:, 0], ends[:, 1])
+    return seq_pts, xbar_line, start_pt, normal_line, tangent_line
 
 ani = FuncAnimation(fig, update, frames=len(inits), blit=True)
-ani.save("images/out.gif", writer=PillowWriter(fps=20), dpi=100)
+ani.save("images/spin.gif", writer=PillowWriter(fps=20), dpi=100)
